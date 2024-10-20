@@ -1,6 +1,5 @@
 import pandas as pd
 import streamlit as st
-import matplotlib.pyplot as plt
 import plotly.express as px
 
 # Load data from CSV file
@@ -46,11 +45,8 @@ for produtor in df['PRODUTOR'].unique():
 
 # Produção Mensal
 st.header('Produção Mensal')
-fig, ax = plt.subplots()
-df.groupby('PRODUTOR')['Produção 2023 Kg'].sum().plot(kind='bar', ax=ax)
-plt.ylabel('Produção (Kg)')
-plt.title('Produção Total por Produtor')
-st.pyplot(fig)
+fig = px.bar(df.groupby('PRODUTOR', as_index=False).sum(), x='PRODUTOR', y='Produção 2023 Kg', title='Produção Total por Produtor')
+st.plotly_chart(fig)
 
 # SLA (indicador fictício para exemplo)
 sla = 99.68
