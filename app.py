@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import plotly.express as px
 
 # Load data from CSV file
-df = pd.read_csv('/mnt/data/Producao_de_mel_2023_limpo.csv')
+df = pd.read_csv('/Producao_de_mel_2023_limpo.csv')
 
 # Streamlit app setup
 st.set_page_config(page_title='Dashboard de Produção de Mel', layout='wide')
