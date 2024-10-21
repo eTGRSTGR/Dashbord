@@ -1,71 +1,71 @@
 import pandas as pd
+import matplotlib.pyplot as plt
 import streamlit as st
-import plotly.express as px
+from io import BytesIO
 
-# Load data from CSV file
-df = pd.read_csv('/Producao_de_mel_2023_limpo.csv')
+def generate_chart(data, title, xlabel, ylabel, color=['orange', 'green']):
+    fig, ax = plt.subplots(figsize=(10, 6))
+    bars = ax.bar(data['labels'], data['values'], color=color)
+    
+    for bar in bars:
+        yval = bar.get_height()
+        ax.text(bar.get_x() + bar.get_width() / 2, yval, f'{yval:.2f}', ha='center', va='bottom')
 
-# Streamlit app setup
-st.set_page_config(page_title='Dashboard de Produção de Mel', layout='wide')
-st.title('Operação - Produção de Mel 2023')
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel(ylabel)
+    ax.set_title(title)
+    plt.xticks(rotation=45)
+    plt.tight_layout()
 
-# Sidebar filters
-st.sidebar.header('Filtros')
-produtor_selecionado = st.sidebar.multiselect('Selecionar Produtores', df['PRODUTOR'].unique())
+    return fig
 
-# Apply filters if any
-if produtor_selecionado:
-    df = df[df['PRODUTOR'].isin(produtor_selecionado)]
+def main():
+    st.title('Dashboard da Produção de Mel 2023')
+    
+    # Carregar dados
+    uploaded_file = st.file_uploader("Envie o arquivo CSV de produção de mel", type="csv")
+    if uploaded_file is not None:
+        df = pd.read_csv(uploaded_file)
+        df['Produção 2023 L'] = pd.to_numeric(df['Produção 2023 L'], errors='coerce')
+        df['Produção 2023 Kg'] = pd.to_numeric(df['Produção 2023 Kg'], errors='coerce')
 
-# KPI cards
-st.header('Hoje')
-col1, col2, col3, col4 = st.columns(4)
+        # Filtrar apenas os dados relevantes de produtores e produção total de mel
+        produtores_validos = df['PRODUTOR'].dropna()
+        producao_total_litros = df['Produção 2023 L'].fillna(0)
+        producao_total_kg = df['Produção 2023 Kg'].fillna(0)
 
-# Calcular KPIs
-total_producao_kg = df['Produção 2023 Kg'].sum()
-total_colmeias = df['Qntd. Colmeia'].sum()
-total_colmeias_produtivas = df['Qntd. Colmeia produtiva'].sum()
-media_coe = df['COE'].mean()
+        # Garantir que todos os arrays tenham o mesmo comprimento
+        produtores_validos = produtores_validos[:min(len(producao_total_litros), len(producao_total_kg))]
+        producao_total_litros = producao_total_litros[:len(produtores_validos)]
+        producao_total_kg = producao_total_kg[:len(produtores_validos)]
 
-# Display KPIs
-col1.metric('Produção Total (Kg)', f"{total_producao_kg:.2f} Kg")
-col2.metric('Total de Colmeias', int(total_colmeias))
-col3.metric('Colmeias Produtivas', int(total_colmeias_produtivas))
-col4.metric('Média COE', f"R$ {media_coe:.2f}")
+        st.header('Gráfico de Barras da Produção Total em Litros e Quilos (2023)')
+        fig1 = generate_chart(
+            data={'labels': produtores_validos, 'values': producao_total_litros + producao_total_kg},
+            title='Produção Total em Litros e Quilos (2023)',
+            xlabel='Produtor',
+            ylabel='Produção (L e Kg)',
+            color=['green', 'blue']
+        )
+        st.pyplot(fig1)
+        
+        # Cálculo da produção total para Litros e Quilos
+        producao_total_litros_2023 = producao_total_litros.sum()
+        producao_total_kg_2023 = producao_total_kg.sum()
+        
+        comparacao_data = {
+            'labels': ['Produção em Litros 2023', 'Produção em Quilos 2023'],
+            'values': [producao_total_litros_2023, producao_total_kg_2023]
+        }
 
-# Produção por produtor
-st.header('Produção por Produtor')
-for produtor in df['PRODUTOR'].unique():
-    produtor_data = df[df['PRODUTOR'] == produtor]
-    st.subheader(produtor)
-    col1, col2, col3 = st.columns(3)
-    col1.metric('Produção Total (Kg)', f"{produtor_data['Produção 2023 Kg'].sum():.2f} Kg")
-    col2.metric('Colmeias', int(produtor_data['Qntd. Colmeia'].sum()))
-    col3.metric('COE', f"R$ {produtor_data['COE'].mean():.2f}")
+        st.header('Gráfico Comparativo da Produção Total em Litros e Quilos (2023)')
+        fig2 = generate_chart(
+            data=comparacao_data,
+            title='Comparativo de Produção (Litros vs Quilos, 2023)',
+            xlabel='Unidade de Medida',
+            ylabel='Produção Total'
+        )
+        st.pyplot(fig2)
 
-# Produção Mensal
-st.header('Produção Mensal')
-fig = px.bar(df.groupby('PRODUTOR', as_index=False).sum(), x='PRODUTOR', y='Produção 2023 Kg', title='Produção Total por Produtor')
-st.plotly_chart(fig)
-
-# SLA (indicador fictício para exemplo)
-sla = 99.68
-st.header('SLA')
-st.metric('SLA', f"{sla}%")
-
-# Gráfico de Produção por Colheita
-st.header('Produção por Colheita')
-df_melted = df.melt(id_vars=['PRODUTOR'], value_vars=['1ª Colheita', '2ª  Colheita', '3ª  Colheita', '4ª  Colheita', '5ª  Colheita', '6ª Colheita'], 
-                    var_name='Colheita', value_name='Produção (Kg)')
-df_melted.dropna(inplace=True)
-fig = px.bar(df_melted, x='Colheita', y='Produção (Kg)', color='PRODUTOR', barmode='group', title='Produção por Colheita')
-st.plotly_chart(fig)
-
-# Gráfico de Colmeias Produtivas
-st.header('Colmeias Produtivas por Produtor')
-fig = px.pie(df, values='Qntd. Colmeia produtiva', names='PRODUTOR', title='Distribuição de Colmeias Produtivas por Produtor')
-st.plotly_chart(fig)
-
-# Tabela de Detalhes
-st.header('Detalhes da Produção')
-st.dataframe(df)
+if __name__ == "__main__":
+    main()
